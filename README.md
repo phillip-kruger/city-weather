@@ -5,7 +5,8 @@
 A [House Elves](https://github.com/House-elves) elf for Elf Desk. It shows the weather now and the next three days
 (with a weather icon, highs, lows, chance of rain) for the cities you pick, plus today's sunrise and sunset. Its tab has one card per city, in the order you listed them,
 and a line at the top says when it was last updated. If a city can't be found, its card says so and tells you to fix
-the name in Settings. The dashboard card gives one sentence, like the first city's temperature now and its rain
+the name in Settings. When other countries have a city of the same name, its card says which, so you can add the
+country you meant. The dashboard card gives one sentence, like the first city's temperature now and its rain
 chance today. **Refresh** looks everything up again; **Settings** changes the cities or switches to Fahrenheit and mph.
 
 It runs every morning at 06:30, weekends included, once after setup, and whenever you click Refresh. No account or
@@ -20,7 +21,10 @@ key is needed.
 ## Adding it
 
 Click **+** on Elf Desk and pick **City weather**. In Settings, list your cities separated by semicolons, like
-`Paris, France; Tokyo; Austin, Texas` (a country or region after a comma helps when names are shared), then Refresh.
+`Paris, France; Newcastle, UK; Austin, Texas`, then Refresh. When a name is shared, add the country after a comma: its
+name (`United Kingdom`), its code (`GB`), or `UK`, `USA`, `England`, `Scotland` or `Wales`. A region, like a state,
+works too. With a country, it picks that country's biggest city of the name, so `Newcastle, UK` is Newcastle upon
+Tyne.
 
 ## Running it by hand
 

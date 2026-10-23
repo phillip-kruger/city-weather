@@ -25,7 +25,12 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 
 /**
@@ -33,7 +38,7 @@ import java.util.concurrent.Callable;
  * three days for its tab on Elf Desk. Without --save it prints what it found (the desk's dry run). It only reads
  * from Open-Meteo, sending the city names and coordinates, and never posts anything.
  */
-@Command(name = "city-weather", mixinStandardHelpOptions = true, version = "0.2.0", description = "Shows the weather for your cities on Elf Desk")
+@Command(name = "city-weather", mixinStandardHelpOptions = true, version = "0.3.0", description = "Shows the weather for your cities on Elf Desk")
 public class CityWeather implements Callable<Integer> {
 
     static final ObjectMapper JSON = new ObjectMapper();
@@ -68,9 +73,13 @@ public class CityWeather implements Callable<Integer> {
                 if (lookup(query, city, config.fahrenheit)) {
                     ok++;
                     System.out.println(describe(city));
+                    if (!city.path("elsewhere").isEmpty()) {
+                        System.out.println("  Also in " + String.join(", ", strings(city.path("elsewhere"))) + ": add the country after a comma to pick another.");
+                    }
                 } else {
                     city.put("error", "notFound");
-                    System.out.println("Couldn't find " + query + ". Fix the name in Settings.");
+                    System.out.println("Couldn't find " + query + "." + (city.path("foundIn").isEmpty() ? "" :
+                            " It's in " + String.join(", ", strings(city.path("foundIn"))) + ".") + " Fix it in Settings.");
                 }
             } catch (Exception e) {
                 failed++;
@@ -87,21 +96,37 @@ public class CityWeather implements Callable<Integer> {
 
     /** Finds the city, then fills in its weather. False when Open-Meteo doesn't know the name. */
     static boolean lookup(String query, ObjectNode city, boolean fahrenheit) throws Exception {
-        // "Paris, France": the name is searched, the rest narrows the matches to the right country or region.
-        int comma = query.indexOf(',');
-        String name = (comma < 0 ? query : query.substring(0, comma)).strip();
-        String hint = comma < 0 ? "" : query.substring(comma + 1).strip().toLowerCase(Locale.ROOT);
-        JsonNode found = get(GEO + "?count=10&language=en&format=json&name=" + enc(name)).path("results");
+        // "Newcastle, UK": the name is searched, the rest says which country or region it's in.
+        String[] parts = query.split(",");
+        String name = parts[0].strip();
+        List<String> hints = new ArrayList<>();
+        for (int i = 1; i < parts.length; i++) if (!parts[i].isBlank()) hints.add(parts[i].strip().toLowerCase(Locale.ROOT));
+        // A country narrows the search itself, so a small country's city isn't crowded out by bigger ones elsewhere.
+        String code = hints.stream().map(CityWeather::countryCode).filter(c -> c != null).findFirst().orElse(null);
+        JsonNode found = get(GEO + "?count=" + (hints.isEmpty() ? 10 : 100) + "&language=en&format=json&name=" + enc(name)
+                + (code == null ? "" : "&countryCode=" + code)).path("results");
+        if (code != null && !found.isArray()) found = get(GEO + "?count=100&language=en&format=json&name=" + enc(name)).path("results");
         JsonNode match = null;
         for (JsonNode r : found) {
-            if (hint.isEmpty() || hint.equals(r.path("country").asText("").toLowerCase(Locale.ROOT))
-                    || hint.equals(r.path("country_code").asText("").toLowerCase(Locale.ROOT))
-                    || hint.equals(r.path("admin1").asText("").toLowerCase(Locale.ROOT))) {
+            if (!r.path("latitude").isNumber() || !r.path("longitude").isNumber() || !hints.stream().allMatch(h -> in(r, h))) continue;
+            if (hints.isEmpty()) {
                 match = r;
                 break;
             }
+            // With a country given, take its biggest place of that name: "Newcastle, UK" is Newcastle upon Tyne.
+            if (match == null || named(r, name) && (!named(match, name) || r.path("population").asLong() > match.path("population").asLong())) match = r;
         }
-        if (match == null || !match.path("latitude").isNumber() || !match.path("longitude").isNumber()) return false;
+        // The other countries with a place of this name, so the tab can say which to add.
+        Set<String> countries = new LinkedHashSet<>();
+        for (JsonNode r : found) {
+            String country = r.path("country").asText("");
+            if (named(r, name) && !country.isEmpty() && (match == null || !country.equals(match.path("country").asText(""))) && countries.size() < 4) {
+                countries.add(clip(country, 100));
+            }
+        }
+        ArrayNode elsewhere = city.putArray(match == null ? "foundIn" : "elsewhere");
+        if (match == null || hints.isEmpty()) countries.forEach(elsewhere::add);
+        if (match == null) return false;
         city.put("name", clip(match.path("name").asText(name), 100));
         String place = String.join(", ", clip(match.path("admin1").asText(""), 100), clip(match.path("country").asText(""), 100));
         city.put("place", place.startsWith(", ") ? place.substring(2) : place.endsWith(", ") ? place.substring(0, place.length() - 2) : place);
@@ -135,9 +160,43 @@ public class CityWeather implements Callable<Integer> {
         return true;
     }
 
+    /** True when the place is in the country or region the hint names: by its name, its code, or a name people use for it. */
+    static boolean in(JsonNode r, String hint) {
+        String code = r.path("country_code").asText("");
+        for (String field : new String[] {"country", "country_code", "admin1", "admin2"}) {
+            if (hint.equals(r.path(field).asText("").toLowerCase(Locale.ROOT))) return true;
+        }
+        return !REGIONS.containsKey(hint) && code.equalsIgnoreCase(countryCode(hint));
+    }
+
+    /** The place is called the name, or starts with it as a word: Newcastle upon Tyne for Newcastle, not Newcastleton. */
+    static boolean named(JsonNode r, String name) {
+        String n = r.path("name").asText("").toLowerCase(Locale.ROOT), q = name.toLowerCase(Locale.ROOT);
+        return n.equals(q) || n.startsWith(q + " ") || n.startsWith(q + "-");
+    }
+
+    /** Parts of a country people write instead of it. They narrow the search to the country, then match the region. */
+    static final Map<String, String> REGIONS = Map.of("england", "GB", "scotland", "GB", "wales", "GB", "northern ireland", "GB");
+    /** What people write for a country that isn't its English name or its two-letter code. */
+    static final Map<String, String> ALIASES = Map.ofEntries(Map.entry("uk", "GB"), Map.entry("britain", "GB"),
+            Map.entry("great britain", "GB"), Map.entry("usa", "US"), Map.entry("u.s.", "US"), Map.entry("u.s.a.", "US"),
+            Map.entry("america", "US"), Map.entry("united states of america", "US"), Map.entry("uae", "AE"),
+            Map.entry("holland", "NL"), Map.entry("czech republic", "CZ"), Map.entry("korea", "KR"), Map.entry("russia", "RU"));
+
+    /** "GB" for "United Kingdom", "uk", "gb" or "England"; null when the hint isn't a country. */
+    static String countryCode(String hint) {
+        String h = hint.toLowerCase(Locale.ROOT);
+        if (REGIONS.containsKey(h)) return REGIONS.get(h);
+        if (ALIASES.containsKey(h)) return ALIASES.get(h);
+        for (String code : Locale.getISOCountries()) {
+            if (h.equals(code.toLowerCase(Locale.ROOT)) || h.equals(Locale.of("", code).getDisplayCountry(Locale.ENGLISH).toLowerCase(Locale.ROOT))) return code;
+        }
+        return null;
+    }
+
     static String describe(ObjectNode city) {
         JsonNode today = city.path("days").path(0);
-        return city.path("name").asText() + ": " + city.path("temp").asInt() + "°, " + city.path("description").asText().toLowerCase(Locale.ROOT)
+        return city.path("name").asText() + (city.path("place").asText("").isEmpty() ? "" : " (" + city.path("place").asText() + ")") + ": " + city.path("temp").asInt() + "°, " + city.path("description").asText().toLowerCase(Locale.ROOT)
                 + (today.has("rain") ? ", " + today.path("rain").asInt() + "% chance of rain today" : "");
     }
 
@@ -190,6 +249,12 @@ public class CityWeather implements Callable<Integer> {
             if (body.length > MAX_BYTES) throw new IOException("Open-Meteo's answer is too big");
             return JSON.readTree(body);
         }
+    }
+
+    static List<String> strings(JsonNode array) {
+        List<String> out = new ArrayList<>();
+        array.forEach(n -> out.add(n.asText()));
+        return out;
     }
 
     static String enc(String s) {

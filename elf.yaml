@@ -1,7 +1,7 @@
 # A House Elves elf: what Elf Desk needs to install, set up and run city-weather. AGENTS.md says what each field means.
 name: city-weather
 title: City weather
-version: 0.2.0
+version: 0.3.0
 author: "@phillip-kruger"
 description: Shows the weather now and the next three days (icons, highs, lows, chance of rain) and today's sunrise and sunset for the cities you pick, refreshed every morning and on click.
 main: CityWeather.java
@@ -17,7 +17,7 @@ writes:
 settings:
   - key: CITIES
     label: Cities
-    help: "The cities to show, separated by semicolons, like: Paris, France; Tokyo; Austin, Texas. Adding a country or region after a comma helps when names are shared."
+    help: "The cities to show, separated by semicolons, like: Paris, France; Newcastle, UK; Austin, Texas. When a name is shared, add the country after a comma: its name, its code (GB, US) or UK, USA, England. A region, like a state, works too."
     kind: text
     default: "Melbourne; Brno; Raleigh"
   - key: FAHRENHEIT

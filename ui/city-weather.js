@@ -9,6 +9,11 @@ async function forecast() {
     return (await elf.readJson('forecast', 'latest.json')) ?? null;
 }
 
+/** "A, B and C" */
+function and(list) {
+    return list.length < 2 ? (list[0] ?? '') : `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
+}
+
 /** "Tue" for a date like 2026-10-27. */
 function weekday(date) {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date ?? '');
@@ -79,7 +84,9 @@ class CityWeatherTab extends LitElement {
         const title = c.name || c.query;
         if (c.error === 'notFound') {
             return html`<section class="panel city"><h2>${c.query}</h2>
-                <p class="missing">Couldn't find this city. Fix the name in Settings, then Refresh.</p></section>`;
+                <p class="missing">${c.foundIn?.length
+                    ? `Couldn't find this city there. There's one in ${and(c.foundIn)}: fix the country in Settings, then Refresh.`
+                    : "Couldn't find this city. Fix the name in Settings, then Refresh."}</p></section>`;
         }
         if (c.error) {
             return html`<section class="panel city"><h2>${title}</h2>
@@ -89,6 +96,8 @@ class CityWeatherTab extends LitElement {
         const rows = (c.days ?? []).slice(1, 4);
         return html`<section class="panel city">
             <div><h2>${title}</h2>${c.place ? html`<p class="place">${c.place}</p>` : ''}</div>
+            ${c.elsewhere?.length ? html`<p class="missing">Not this one? There's also one in ${and(c.elsewhere)}. In Settings,
+                add the country after a comma, like ${c.query}, ${c.elsewhere[0]}.</p>` : ''}
             <div class="now"><span class="icon" aria-hidden="true">${c.icon}</span><span class="temp">${c.temp}${d.tempUnit}</span><span class="desc">${c.description}</span>
                 <span class="wind">Wind ${c.wind} ${d.windUnit}</span></div>
             ${sun ? html`<p class="sun">Sunrise ${sun.sunrise} · Sunset ${sun.sunset}</p>` : ''}
