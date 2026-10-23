@@ -33,7 +33,7 @@ import java.util.concurrent.Callable;
  * three days for its tab on Elf Desk. Without --save it prints what it found (the desk's dry run). It only reads
  * from Open-Meteo, sending the city names and coordinates, and never posts anything.
  */
-@Command(name = "city-weather", mixinStandardHelpOptions = true, version = "0.1.0", description = "Shows the weather for your cities on Elf Desk")
+@Command(name = "city-weather", mixinStandardHelpOptions = true, version = "0.2.0", description = "Shows the weather for your cities on Elf Desk")
 public class CityWeather implements Callable<Integer> {
 
     static final ObjectMapper JSON = new ObjectMapper();
@@ -108,7 +108,7 @@ public class CityWeather implements Callable<Integer> {
 
         String url = FORECAST_API + "?latitude=" + match.path("latitude").asDouble() + "&longitude=" + match.path("longitude").asDouble()
                 + "&current=temperature_2m,weather_code,wind_speed_10m"
-                + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
+                + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset"
                 + "&forecast_days=4&timezone=auto"
                 + (fahrenheit ? "&temperature_unit=fahrenheit&wind_speed_unit=mph" : "");
         JsonNode w = get(url);
@@ -117,11 +117,17 @@ public class CityWeather implements Callable<Integer> {
         city.put("temp", Math.round(cur.path("temperature_2m").asDouble()));
         city.put("wind", Math.round(cur.path("wind_speed_10m").asDouble()));
         city.put("description", describe(cur.path("weather_code").asInt(-1)));
+        city.put("icon", icon(cur.path("weather_code").asInt(-1)));
         // Day 0 is today (for the card); the next three days are the tab's rows.
         ArrayNode days = city.putArray("days");
         for (int i = 0; i < Math.min(4, daily.path("time").size()); i++) {
             ObjectNode d = days.addObject().put("date", daily.path("time").path(i).asText(""))
-                    .put("description", describe(daily.path("weather_code").path(i).asInt(-1)));
+                    .put("description", describe(daily.path("weather_code").path(i).asInt(-1)))
+                    .put("icon", icon(daily.path("weather_code").path(i).asInt(-1)));
+            if (i == 0) {
+                d.put("sunrise", clock(daily.path("sunrise").path(0).asText("")));
+                d.put("sunset", clock(daily.path("sunset").path(0).asText("")));
+            }
             d.put("high", Math.round(daily.path("temperature_2m_max").path(i).asDouble()));
             d.put("low", Math.round(daily.path("temperature_2m_min").path(i).asDouble()));
             if (daily.path("precipitation_probability_max").path(i).isNumber()) d.put("rain", daily.path("precipitation_probability_max").path(i).asInt());
@@ -150,6 +156,27 @@ public class CityWeather implements Callable<Integer> {
             case 95, 96, 99 -> "Thunderstorm";
             default -> "Unknown";
         };
+    }
+
+    /** One emoji per weather code, matching describe(). */
+    static String icon(int code) {
+        return switch (code) {
+            case 0, 1 -> "☀️";
+            case 2 -> "⛅";
+            case 3 -> "☁️";
+            case 45, 48 -> "🌫️";
+            case 51, 53, 55, 56, 57 -> "🌦️";
+            case 61, 63, 65, 66, 67 -> "🌧️";
+            case 71, 73, 75, 77, 85, 86 -> "❄️";
+            case 80, 81, 82 -> "🌦️";
+            case 95, 96, 99 -> "⛈️";
+            default -> "";
+        };
+    }
+
+    /** "06:12" from Open-Meteo's local "2026-10-23T06:12", or "" if it isn't that shape. */
+    static String clock(String t) {
+        return t.matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}") ? t.substring(11) : "";
     }
 
     static JsonNode get(String url) throws Exception {

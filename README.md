@@ -3,7 +3,7 @@
 # city-weather
 
 A [House Elves](https://github.com/House-elves) elf for Elf Desk. It shows the weather now and the next three days
-(highs, lows, chance of rain) for the cities you pick. Its tab has one card per city, in the order you listed them,
+(with a weather icon, highs, lows, chance of rain) for the cities you pick, plus today's sunrise and sunset. Its tab has one card per city, in the order you listed them,
 and a line at the top says when it was last updated. If a city can't be found, its card says so and tells you to fix
 the name in Settings. The dashboard card gives one sentence, like the first city's temperature now and its rain
 chance today. **Refresh** looks everything up again; **Settings** changes the cities or switches to Fahrenheit and mph.

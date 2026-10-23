@@ -33,6 +33,8 @@ class CityWeatherTab extends LitElement {
         .place { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
         .now { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
         .temp { font-size: 34px; font-weight: 600; letter-spacing: -0.022em; }
+        .icon { font-size: 30px; }
+        .sun { margin: 0; color: var(--muted); font-size: 14px; }
         .desc, .wind { color: var(--muted); font-size: 14px; }
         table { border-collapse: collapse; width: 100%; font-size: 14px; }
         th { text-align: left; font-weight: 400; color: var(--muted); font-size: 13px; padding: 0 0 4px; }
@@ -83,14 +85,16 @@ class CityWeatherTab extends LitElement {
             return html`<section class="panel city"><h2>${title}</h2>
                 <p class="missing">Couldn't get the weather for this city. Refresh to try again.</p></section>`;
         }
+        const sun = c.days?.[0]?.sunrise && c.days[0].sunset ? c.days[0] : null;
         const rows = (c.days ?? []).slice(1, 4);
         return html`<section class="panel city">
             <div><h2>${title}</h2>${c.place ? html`<p class="place">${c.place}</p>` : ''}</div>
-            <div class="now"><span class="temp">${c.temp}${d.tempUnit}</span><span class="desc">${c.description}</span>
+            <div class="now"><span class="icon" aria-hidden="true">${c.icon}</span><span class="temp">${c.temp}${d.tempUnit}</span><span class="desc">${c.description}</span>
                 <span class="wind">Wind ${c.wind} ${d.windUnit}</span></div>
+            ${sun ? html`<p class="sun">Sunrise ${sun.sunrise} · Sunset ${sun.sunset}</p>` : ''}
             <table>
                 <thead><tr><th>Day</th><th>Weather</th><th class="n">High</th><th class="n">Low</th><th class="n">Rain</th></tr></thead>
-                <tbody>${rows.map(r => html`<tr><td>${weekday(r.date)}</td><td>${r.description}</td>
+                <tbody>${rows.map(r => html`<tr><td>${weekday(r.date)}</td><td><span aria-hidden="true">${r.icon}</span> ${r.description}</td>
                     <td class="n">${r.high}${d.tempUnit}</td><td class="n">${r.low}${d.tempUnit}</td>
                     <td class="n">${r.rain == null ? '' : `${r.rain}%`}</td></tr>`)}</tbody>
             </table>
