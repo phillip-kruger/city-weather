@@ -1,18 +1,20 @@
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-/** ~/.config/my-elf/config: KEY=value lines. Elf Desk writes it from the settings in elf.yaml; secrets live only here. */
+/** ~/.config/city-weather/config: KEY=value lines. Elf Desk writes it from the settings in elf.yaml. */
 public class Config {
 
-    static final Path DIR = Path.of(System.getProperty("user.home"), ".config", "my-elf");
+    static final Path DIR = Path.of(System.getProperty("user.home"), ".config", "city-weather");
     static final Path FILE = DIR.resolve("config");
+    static final int MAX_CITIES = 10;
 
-    String feedUrl;
-    int maxItems;
-    boolean sumUp;
+    List<String> cities = new ArrayList<>();
+    boolean fahrenheit;
 
     static Config load() throws IOException {
         Map<String, String> raw = new HashMap<>();
@@ -24,11 +26,12 @@ public class Config {
             }
         }
         Config c = new Config();
-        c.feedUrl = raw.getOrDefault("FEED_URL", "");
-        c.maxItems = Integer.parseInt(raw.getOrDefault("MAX_ITEMS", "30"));
-        c.sumUp = Boolean.parseBoolean(raw.getOrDefault("SUM_UP", "false"));
-        if (c.feedUrl.isBlank()) throw new IllegalStateException("Set the feed in my-elf's settings on the desk");
-        if (!c.feedUrl.startsWith("https://") && !c.feedUrl.startsWith("http://")) throw new IllegalStateException("The feed is a web address");
+        for (String city : raw.getOrDefault("CITIES", "Melbourne; Brno; Raleigh").split(";")) {
+            if (!city.isBlank() && !c.cities.contains(city.strip())) c.cities.add(city.strip());
+        }
+        c.fahrenheit = Boolean.parseBoolean(raw.getOrDefault("FAHRENHEIT", "false"));
+        if (c.cities.isEmpty()) throw new IllegalStateException("Set your cities in city-weather's settings on the desk");
+        if (c.cities.size() > MAX_CITIES) throw new IllegalStateException("Pick up to " + MAX_CITIES + " cities in city-weather's settings on the desk");
         return c;
     }
 }

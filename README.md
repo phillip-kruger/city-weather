@@ -1,27 +1,31 @@
 <img src="https://raw.githubusercontent.com/House-elves/elf-desk/main/docs/brand/mark.svg" width="72" alt="House Elves logo: a checkmark that ends in an elf's hat">
 
-# elf-template
+# city-weather
 
-The elf to start a new [House Elves](https://github.com/House-elves) elf from, and the guide to writing one:
-[AGENTS.md](AGENTS.md). Elf Desk's Elf Maker builds new elves from it too.
+A [House Elves](https://github.com/House-elves) elf for Elf Desk. It shows the weather now and the next three days
+(highs, lows, chance of rain) for the cities you pick. Its tab has one card per city, in the order you listed them,
+and a line at the top says when it was last updated. If a city can't be found, its card says so and tells you to fix
+the name in Settings. The dashboard card gives one sentence, like the first city's temperature now and its rain
+chance today. **Refresh** looks everything up again; **Settings** changes the cities or switches to Fahrenheit and mph.
 
-As it is, it's a working elf, **My elf**. It reads a news feed (RSS or Atom) and lists its newest items in its tab,
-with what you haven't read first. **Done** marks an item read. With **Sum up with Claude** on, Claude adds a line or
-two about what's new. It reads the feed on weekday mornings, and its dashboard card says how many items are new.
+It runs every morning at 06:30, weekends included, once after setup, and whenever you click Refresh. No account or
+key is needed.
 
-- **Reads:** the feed you give it, over the internet. With Sum up on, Claude reads the new items, with no tools.
-- **Writes:** nothing outside this machine. What it read is saved in `~/.config/my-elf/runs/`, and what you marked
-  read in `~/.config/my-elf/done/`.
+- **Reads:** Open-Meteo's free geocoding service (geocoding-api.open-meteo.com) to find each city, and its free
+  forecast service (api.open-meteo.com) for the weather there. Its own settings on this machine.
+- **Writes:** nothing outside this machine. It sends your city names to Open-Meteo to look them up, and saves the
+  forecast as a small file in `~/.config/city-weather/forecast/`. Nothing waits for your click, because nothing is
+  posted or sent.
 
-## Making your own elf from it
+## Adding it
 
-1. Click **Use this template** on GitHub, or copy the files.
-2. Rename `my-elf` and `MyElf` everywhere, then change what it does. [AGENTS.md](AGENTS.md) says how each part works.
-3. Check it: `jbang https://github.com/House-elves/elf-runner/blob/main/ElfRunner.java --check-elf .`
-4. Push it and tag the repo `house-elf`. It shows up on Elf Desk's **+** page.
+Click **+** on Elf Desk and pick **City weather**. In Settings, list your cities separated by semicolons, like
+`Paris, France; Tokyo; Austin, Texas` (a country or region after a comma helps when names are shared), then Refresh.
 
 ## Running it by hand
 
-    mkdir -p ~/.config/my-elf && echo 'FEED_URL=https://quarkus.io/feed.xml' > ~/.config/my-elf/config
-    jbang MyElf.java            # prints what it read, saves nothing
-    jbang MyElf.java --save     # saved for its tab on Elf Desk
+    mkdir -p ~/.config/city-weather && echo 'CITIES=Paris, France; Tokyo' > ~/.config/city-weather/config
+    jbang CityWeather.java            # prints the weather, saves nothing
+    jbang CityWeather.java --save     # saved for its tab on Elf Desk
+
+[AGENTS.md](AGENTS.md) is the guide to writing an elf.
